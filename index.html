@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <!-- Favicons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="194x194" href="favicons/favicon-194x194.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="favicons/android-chrome-192x192.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicons/favicon-16x16.png">
+  
+  <meta name="theme-color" content="#ffaa00">
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Monoton|Press+Start+2P|Roboto+Mono" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link href="style.css" rel="stylesheet">
+  
+  <!-- Three.js and Firebase -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/86/three.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-analytics.js"></script>
+  
+  <title>🏁 F1 Racing Game - Online Multiplayer</title>
+  
+  <style>
+    /* Base styles to prevent flickering and ensure proper display */
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Press Start 2P', monospace;
+      background: #000;
+      color: white;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    canvas {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    
+    #fore {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    #fore > * {
+      pointer-events: auto;
+    }
+    
+    /* Hide track data by default */
+    .data {
+      display: none;
+    }
+    
+    /* Loading screen */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a1a 0%, #000 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100000;
+      transition: opacity 0.5s ease;
+    }
+    
+    .loader {
+      text-align: center;
+    }
+    
+    .loader h1 {
+      font-family: 'Monoton', cursive;
+      font-size: 48px;
+      color: #ffaa00;
+      text-shadow: 0 0 20px rgba(255,170,0,0.5);
+      margin-bottom: 30px;
+      animation: glow 1.5s ease infinite;
+    }
+    
+    @keyframes glow {
+      0% { text-shadow: 0 0 20px rgba(255,170,0,0.5); }
+      50% { text-shadow: 0 0 40px rgba(255,170,0,0.8); }
+      100% { text-shadow: 0 0 20px rgba(255,170,0,0.5); }
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,0.1);
+      border-top-color: #ffaa00;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loader p {
+      color: rgba(255,255,255,0.7);
+      font-size: 12px;
+      letter-spacing: 2px;
+    }
+    
+    /* Instructions overlay */
+    #instructions {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 40px;
+      font-size: 12px;
+      border: 2px solid #ffaa00;
+      backdrop-filter: blur(5px);
+      z-index: 9999;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: fadeInOut 3s ease forwards;
+    }
+    
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    }
+    
+    /* Mobile touch controls hint */
+    #touch-hint {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 20px;
+      font-size: 14px;
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(5px);
+      z-index: 9999;
+      text-align: center;
+      pointer-events: none;
+      display: none;
+    }
+    
+    @media (max-width: 768px) {
+      #touch-hint {
+        display: block;
+      }
+    }
+    
+    /* Menu styles */
+    .title {
+      font-family: 'Monoton', cursive;
+      font-size: 8vmin;
+      color: #ffaa00;
+      text-shadow: 0.5vmin 0.5vmin 0 #000, 0 0 5vmin rgba(255,170,0,0.5);
+      letter-spacing: 0.5vmin;
+      transform: translate3d(0, -100vh, 0);
+      transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      margin: 0;
+      text-align: center;
+      width: 100%;
+    }
+    
+    .menuitem {
+      transform: translate3d(0, -100vh, 0);
+      transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      margin: 2vh auto;
+      text-align: center;
+      width: 100%;
+    }
+    
+    #title {
+      font-size: 10vmin;
+      margin-top: 5vh;
+      margin-bottom: 5vh;
+    }
+    
+    #name {
+      background: rgba(0,0,0,0.7);
+      border: 0.3vmin solid #ffaa00;
+      color: white;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 3vmin;
+      padding: 2vmin 4vmin;
+      width: 40vmin;
+      border-radius: 5vmin;
+      text-align: center;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    
+    #name:focus {
+      border-color: #00ffaa;
+      box-shadow: 0 0 30px rgba(0,255,170,0.3);
+    }
+    
+    #colorpicker {
+      position: relative;
+      width: 60vmin;
+      height: 6vmin;
+      background: linear-gradient(90deg, 
+        #ff0000 0%, #ffff00 17%, #00ff00 33%, 
+        #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+      border-radius: 3vmin;
+      margin: 0 auto;
+      border: 0.3vmin solid white;
+      box-shadow: 0 0 20px rgba(255,255,255,0.3);
+      cursor: pointer;
+    }
+    
+    #slider {
+      position: absolute;
+      width: 5vmin;
+      height: 10vmin;
+      background: white;
+      border-radius: 2vmin;
+      top: -2vmin;
+      left: 0;
+      transform: translateX(0);
+      box-shadow: 0 0 20px rgba(255,255,255,0.8);
+      border: 0.2vmin solid #333;
+      pointer-events: none;
+      transition: background 0.1s ease;
+    }
+    
+    #start {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 5vmin;
+      background: #ffaa00;
+      color: black;
+      padding: 2vmin 8vmin;
+      border-radius: 5vmin;
+      display: inline-block;
+      cursor: pointer;
+      border: 0.3vmin solid white;
+      box-shadow: 0 0 30px rgba(255,170,0,0.5);
+      transition: all 0.3s ease;
+    }
+    
+    #start:hover {
+      transform: scale(1.1);
+      background: #ffbb22;
+      box-shadow: 0 0 50px rgba(255,170,0,0.8);
+    }
+    
+    #start:active {
+      transform: scale(0.95);
+    }
+    
+    /* Mode selection buttons */
+    #modewrap {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    
+    #modewrap .button {
+      position: absolute;
+      left: 50%;
+      transform: translate(-50%, -50%) translate3d(0, 100vh, 0);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 6vmin;
+      background: rgba(0,0,0,0.8);
+      color: #ffaa00;
+      padding: 2vmin 10vmin;
+      border-radius: 5vmin;
+      border: 0.3vmin solid #ffaa00;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      pointer-events: auto;
+      backdrop-filter: blur(5px);
+    }
+    
+    #modewrap .button:hover {
+      background: #ffaa00;
+      color: black;
+      transform: translate(-50%, -50%) scale(1.1);
+      box-shadow: 0 0 50px rgba(255,170,0,0.5);
+    }
+    
+    /* Code display */
+    #code {
+      font-family: 'Monoton', cursive;
+      color: #ffaa00;
+      text-shadow: 0 0 20px rgba(255,170,0,0.5);
+      letter-spacing: 2vmin;
+      animation: pulse 2s ease infinite;
+    }
+    
+    /* Input for join code */
+    #incode {
+      position: absolute;
+      top: 30vh;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      border: 0.5vmin solid #ffaa00;
+      color: white;
+      font-family: 'Monoton', cursive;
+      font-size: 12vmin;
+      width: 70vmin;
+      text-align: center;
+      padding: 2vmin;
+      border-radius: 3vmin;
+      outline: none;
+      letter-spacing: 1vmin;
+      text-transform: uppercase;
+    }
+    
+    #incode::placeholder {
+      color: rgba(255,255,255,0.2);
+      font-size: 8vmin;
+    }
+    
+    /* Start game button */
+    #startgame {
+      background: #ffaa00;
+      color: black;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 4vmin;
+      padding: 3vmin 6vmin;
+      border-radius: 5vmin;
+      border: 0.3vmin solid white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 30px rgba(255,170,0,0.5);
+    }
+    
+    #startgame:hover {
+      transform: scale(1.1);
+      background: #ffbb22;
+      box-shadow: 0 0 50px rgba(255,170,0,0.8);
+    }
+    
+    /* Settings and toolbar */
+    #settings {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 1000;
+      backdrop-filter: blur(5px);
+      border: 2px solid rgba(255,255,255,0.3);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: white;
+    }
+    
+    #settings:hover {
+      transform: rotate(90deg);
+      background: rgba(0,0,0,0.8);
+      border-color: #ffaa00;
+    }
+    
+    #settings::after {
+      content: "⚙️";
+    }
+    
+    #toolbar {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      border-radius: 10px;
+      padding: 10px;
+      z-index: 999;
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255,255,255,0.2);
+      transform: translateX(200px);
+      transition: transform 0.3s ease;
+    }
+    
+    #toolbar.sel {
+      transform: translateX(0);
+    }
+    
+    .tools {
+      width: 40px;
+      height: 40px;
+      margin: 5px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    /* Info overlay */
+    .info {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 3vmin;
+      text-align: center;
+      background: rgba(0,0,0,0.8);
+      padding: 3vmin 6vmin;
+      border-radius: 2vmin;
+      border: 0.3vmin solid #ffaa00;
+      z-index: 10000;
+      backdrop-filter: blur(5px);
+      line-height: 1.5;
+      pointer-events: none;
+    }
+    
+    /* Game UI elements */
+    #lap, #countdown, #nitrobar, #nitrolabel {
+      font-family: 'Press Start 2P', monospace;
+    }
+    
+    /* Prevent text selection on mobile */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    input {
+      -webkit-user-select: text;
+      -khtml-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Loading Screen -->
+  <div id="loading">
+    <div class="loader">
+      <h1>F1 RACING</h1>
+      <div class="spinner"></div>
+      <p>LOADING...</p>
+    </div>
+  </div>
+
+  <!-- Track Data (hidden) -->
+  <div id="trackcode" class="data">
+-67,43/76,62 76,62/165,63 165,63/172,62 172,62/178,59 178,59/182,54 182,54/184,48 184,48/185,41 185,41/185,34 185,34/185,-29 185,-29/183,-40 183,-40/180,-45 180,-45/175,-48 175,-48/168,-50 168,-50/161,-51 161,-51/108,-58 108,-58/68,-63 68,-63/61,-63 61,-63/55,-61 55,-61/51,-57 51,-57/50,-53 50,-53/50,-48 50,-48/52,-43 52,-43/55,-39 55,-39/62,-35 62,-35/74,-33 74,-33/149,-25 149,-25/152,-24 152,-24/153,-22 153,-22/154,-19 154,-19/154,-16 154,-16/153,-12 153,-12/150,-9 150,-9/147,-8 147,-8/141,-8 141,-8/74,-11 74,-11/69,-10 69,-10/67,-7 67,-7/66,-4 66,-4/66,-1 66,-1/67,2 67,2/70,9 70,9/76,20 76,20/83,25 83,25/93,29 -64,26/78,48 78,48/161,49 161,49/164,48 164,48/167,46 167,46/169,43 169,43/170,40 170,40/170,36 170,36/170,-29 170,-29/169,-33 169,-33/168,-35 168,-35/166,-36 166,-36/162,-37 162,-37/155,-38 155,-38/66,-51 66,-51/64,-51 64,-51/64,-49 64,-49/65,-48 65,-48/68,-48 68,-48/164,-34 164,-34/166,-33 166,-33/168,-30 168,-30/168,-24 168,-24/167,-2 167,-2/166,0 166,0/164,2 164,2/161,4 161,4/159,5 159,5/154,6 154,6/83,2 136,18/140,15 140,15/146,9 146,9/150,7 150,7/155,7 155,7/156,7 156,7/163,8 163,8/166,10 166,10/168,14 168,14/169,20 169,20/168,27 168,27/167,34 167,34/165,39 164,40/160,43 165,39/164,40 160,43/157,45 142,28/146,23 146,23/150,20 157,45/154,46 154,46/148,47 148,47/144,47 144,47/80,45 80,45/71,44 71,44/63,42 63,42/56,39 56,39/49,31 49,31/46,24 46,24/43,10 43,10/42,-5 42,-5/42,-12 42,-12/41,-18 41,-18/39,-21 39,-21/18,-23 18,-23/-18,-22 14,13/-50,-4 -18,-22/-23,-22 -23,-22/-26,-20 -26,-20/-27,-19 -27,-19/-27,-18 -27,-18/-26,-17 -26,-17/-25,-16 -25,-16/-23,-15 -23,-15/-20,-14 -20,-14/-17,-14 -17,-14/25,-15 -50,-4/-51,-6 -51,-6/-50,-10 -50,-10/-48,-15 -48,-15/-35,-48 -35,-48/-31,-58 -31,-58/-31,-62 -31,-62/-32,-66 -32,-66/-34,-69 -34,-69/-37,-72 -37,-72/-45,-74 -86,3/-89,4 -89,4/-93,5 -93,5/-95,7 -95,7/-100,25 -100,25/-101,34 -101,34/-99,39 -99,39/-96,41 -96,41/-89,42 -90,42/-67,43 -57,-61/-58,-44 -58,-44/-65,-14 -65,-14/-70,4 -70,4/-76,12 -76,12/-85,15 -85,15/-87,22 -87,22/-87,26 -87,26/-84,27 -84,27/-78,27 -78,27/-64,26 -59,7/15,26 15,26/20,26 20,26/27,25 27,25/33,21 -59,7/-61,4 -61,4/-63,-1 -63,-1/-62,-11 -62,-11/-59,-20 -59,-20/-47,-56 -47,-56/-47,-60 -47,-60/-50,-62 -57,-61/-55,-63 -55,-63/-52,-63 -52,-63/-50,-62 37,7/37,-1 37,-1/35,-9 35,-9/32,-14 32,-14/27,-15 27,-15/25,-15 -86,3/-80,-6 -80,-6/-78,-19 -78,-19/-74,-47 -74,-47/-72,-64 -72,-64/-67,-75 -67,-75/-61,-76 -61,-76/-45,-74 1,-3/-25,-3 -25,-3/-35,-6 -35,-6/-38,-11 -38,-11/-40,-19 -40,-19/-39,-25 -39,-25/-36,-31 -36,-31/-32,-33 -32,-33/-1,-34 -1,-34/30,-34 30,-34/44,-33 44,-33/48,-30 48,-30/53,-25 53,-25/55,-16 55,-16/56,-3 56,-3/59,14 59,14/63,26 63,26/68,30 147,36/153,33 153,33/156,29 156,29/157,23 68,30/86,33 93,29/101,31 150,20/153,19 153,19/155,20 155,20/157,22 157,22/157,23 1,-3/18,-3 18,-3/21,-2 21,-2/23,2 14,13/19,12 19,12/21,10 21,10/23,7 23,7/23,2 33,21/36,14 36,14/37,10 37,10/37,6 89,14/84,9 84,9/82,6 82,6/81,4 81,4/80,2 80,2/83,2 89,14/101,18 101,18/113,20 113,20/122,21 122,21/127,21 127,21/130,20 130,20/136,18 86,33/110,34 110,34/132,35 132,35/147,36 101,31/126,33 126,33/135,32 135,32/142,28 |-80,43/-79,27 136,5/136,-9 43,10/58,9 |-58,19 -60,9 -48,11 -68,19 -41,20 -40,13 -24,20 -13,26 15,30 -8,21 -1,28 0,28 13,25 29,34 43,39 46,30 29,25 -65,2 -65,-5 -64,-5 -62,-13 -57,-28 -54,-47 -49,-59 -50,-45 -34,-5 -14,-4 0,1 14,5 21,-1 11,-2 8,4 -10,2 -46,-13 -38,-29 -25,-46 -15,-41 14,-44 35,-40 61,-27 31,-18 22,-19 5,-19 -10,-19 63,-22 62,-22 57,-15 57,-14 57,-6 60,5 61,5 62,20 73,26 80,30 147,33 156,27 123,18 108,16 98,9 104,8 105,8 119,10 136,11 137,-22 118,-20 108,-18 96,-14 83,-19 84,-23 108,-24 -61,6 -60,6 -60,6 -59,6 ||-89,35/93
+  </div>
+
+  <!-- Foreground UI Container -->
+  <div id="fore">
+    <!-- Title -->
+    <div class="title" id="title">F1 RACING</div>
+
+    <!-- Name Input -->
+    <div class="menuitem title">
+      <input id="name" class="title" placeholder="YOUR NAME" value="DRIVER" maxlength="20">
+    </div>
+
+    <!-- Color Picker -->
+    <div class="menuitem title">
+      <div id="colorpicker">
+        <div id="slider"></div>
+      </div>
+    </div>
+
+    <!-- Start Button -->
+    <div class="menuitem title">
+      <div id="start" onclick="menu2()">START!</div>
+    </div>
+
+    <!-- Settings and Toolbar -->
+    <div id="settings"></div>
+    <div id="toolbar"></div>
+  </div>
+
+  <!-- Game UI Elements (created by JS, but defined here for clarity) -->
+  <div id="lap"></div>
+  <div id="countdown"></div>
+  <div id="nitrobar"><div id="nitrofill"></div></div>
+  <div id="nitrolabel">NITRO</div>
+
+  <!-- Instructions Overlay (shown on first load) -->
+  <div id="instructions">
+    ↑/W = Accelerate | ↓/S = Brake | ←/A →/D = Steer | SHIFT = Nitro
+  </div>
+
+  <!-- Mobile Touch Hint -->
+  <div id="touch-hint">
+    👆 LEFT HALF = STEER LEFT<br>
+    👆 RIGHT HALF = STEER RIGHT<br>
+    👆 TOP HALF = ACCELERATE
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // Hide loading screen when page is ready
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        document.getElementById('loading').style.opacity = '0';
+        setTimeout(function() {
+          document.getElementById('loading').style.display = 'none';
+        }, 500);
+      }, 1000);
+    });
+
+    // Pre-declare functions for HTML onclick handlers
+    var color, updateColor, menu2, host, joinGame, codeCheck;
+  </script>
+
+  <!-- Main Game Script -->
+  <script src="style.js"></script>
+
+  <!-- Additional initialization -->
+  <script>
+    // Fallback for any missing functions
+    window.menu2 = window.menu2 || function() { console.log('Menu not ready'); };
+    window.host = window.host || function() { console.log('Host not ready'); };
+    window.joinGame = window.joinGame || function() { console.log('Join not ready'); };
+    window.updateColor = window.updateColor || function(x) { console.log('Color update:', x); };
+    
+    // Handle touch events to prevent scrolling while playing
+    document.body.addEventListener('touchmove', function(e) {
+      if (window.gameStarted) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    
+    // Prevent context menu on long press
+    document.addEventListener('contextmenu', function(e) {
+      if (e.target.tagName !== 'INPUT') {  
+        e.preventDefault();
+      }
+    });
+  </script>
+</body>
+</html>
