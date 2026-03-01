@@ -467,6 +467,31 @@
       -ms-user-select: text;
       user-select: text;
     }
+
+    /* ----- Prashant watermark (subtle, bottom-left) ----- */
+    #prashant-watermark {
+      position: fixed;
+      bottom: 12px;
+      left: 18px;
+      z-index: 1000000;   /* very high to stay above everything */
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      color: rgba(255, 170, 0, 0.55); /* semi‑transparent F1 gold */
+      text-shadow: 0 0 8px rgba(0,0,0,0.7);
+      letter-spacing: 1.5px;
+      pointer-events: none; /* clicks pass through */
+      backdrop-filter: none;
+      background: none;
+      border: none;
+      opacity: 0.85;
+      white-space: nowrap;
+      transform: rotate(0deg);
+      transition: opacity 0.2s;
+    }
+    /* a tiny extra shadow to make it readable on light backgrounds */
+    #prashant-watermark {
+      text-shadow: 1px 1px 2px #00000080, 0 0 10px #000000b0;
+    }
   </style>
 </head>
 
@@ -529,6 +554,9 @@
     👆 RIGHT HALF = STEER RIGHT<br>
     👆 TOP HALF = ACCELERATE
   </div>
+
+  <!-- ========== WATERMARK: PRASHANT ========== -->
+  <div id="prashant-watermark">PRASHANT</div>
 
   <!-- Scripts -->
   <script>
